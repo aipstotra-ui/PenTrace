@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PenTrace — pricing & early access</title>
+    <meta name="description" content="Pricing is coming soon. Join the PenTrace waitlist and get 50% off as an early test user." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/src/site.css" />
+    <style>
+      .price-hero { text-align: center; padding: clamp(56px, 8vw, 96px) 0 20px; }
+      .price-hero h1 { font-size: clamp(2.4rem, 5vw, 3.8rem); }
+      .price-hero h1 em { font-style: italic; color: var(--accent); }
+      .price-hero p { color: var(--ink-soft); font-size: 1.15rem; margin: 18px auto 0; max-width: 52ch; }
+
+      .offer-wrap { padding: 20px 0 40px; }
+      .offer {
+        position: relative; overflow: hidden;
+        background: #fff; border: 1px solid rgba(23,23,28,0.1);
+        border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+        max-width: 660px; margin: 0 auto; padding: clamp(30px, 5vw, 52px);
+      }
+      .offer .ruled-top { position: absolute; inset: 0 0 auto 0; height: 6px; background: linear-gradient(90deg, var(--accent), #6f8bff); }
+      .badge {
+        display: inline-flex; align-items: center; gap: 8px;
+        font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase;
+        background: var(--accent-wash); color: var(--accent-deep);
+        padding: 7px 13px; border-radius: 999px; margin-bottom: 22px;
+      }
+      .badge b { color: var(--margin); }
+      .offer h2 { font-size: clamp(1.6rem, 3vw, 2.2rem); }
+      .price-line { display: flex; align-items: baseline; gap: 12px; margin: 20px 0 6px; flex-wrap: wrap; }
+      .price-line .soon { font-family: var(--serif); font-size: clamp(2rem, 4vw, 2.8rem); font-weight: 600; color: var(--ink); }
+      .price-line .was { font-family: var(--mono); font-size: 0.9rem; color: var(--ink-faint); }
+      .price-line .off { font-family: var(--mono); font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ok); border: 1px solid rgba(31,158,107,0.35); border-radius: 999px; padding: 4px 10px; }
+      .offer .sub { color: var(--ink-soft); margin-bottom: 26px; }
+
+      .incl { list-style: none; padding: 0; margin: 0 0 30px; display: grid; gap: 12px; }
+      .incl li { display: flex; gap: 11px; align-items: flex-start; color: var(--ink); font-size: 1rem; }
+      .incl li .c { color: var(--ok); flex: none; margin-top: 2px; }
+      .incl li span.mut { color: var(--ink-faint); }
+
+      form.waitlist { display: flex; gap: 10px; flex-wrap: wrap; }
+      form.waitlist input[type="email"] {
+        flex: 1; min-width: 220px;
+        font-family: var(--sans); font-size: 1rem;
+        padding: 13px 16px; border-radius: 10px;
+        border: 1px solid rgba(23,23,28,0.18); background: var(--paper);
+        color: var(--ink); outline: none; transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      }
+      form.waitlist input[type="email"]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-wash); }
+      form.waitlist .btn-primary { flex: none; }
+      .form-note { font-family: var(--mono); font-size: 0.74rem; color: var(--ink-faint); margin-top: 14px; letter-spacing: 0.03em; }
+      .success { display: none; align-items: center; gap: 12px; background: rgba(31,158,107,0.08); border: 1px solid rgba(31,158,107,0.3); border-radius: 12px; padding: 16px 18px; color: var(--ink); }
+      .success.show { display: flex; }
+      .success .tick { width: 26px; height: 26px; border-radius: 50%; background: var(--ok); color: #fff; display: grid; place-items: center; flex: none; }
+
+      .reassure { padding: 20px 0 90px; }
+      .reassure .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; max-width: 900px; margin: 0 auto; }
+      .reassure .q { font-family: var(--serif); font-size: 1.1rem; font-weight: 600; margin-bottom: 6px; }
+      .reassure .a { color: var(--ink-soft); font-size: 0.96rem; }
+      @media (max-width: 800px) { .reassure .grid3 { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <!-- NAV -->
+    <header class="nav">
+      <div class="wrap nav-inner">
+        <a class="brand" href="/">PenTrace<span class="dot">.</span></a>
+        <nav class="nav-links">
+          <a href="/">Home</a>
+          <a href="/demo.html">Live demo</a>
+          <a href="/pricing.html" aria-current="page">Pricing</a>
+        </nav>
+        <span class="nav-spacer"></span>
+        <a class="btn btn-primary" href="/demo.html">Try the demo <span class="arrow">→</span></a>
+      </div>
+    </header>
+
+    <section class="price-hero">
+      <div class="wrap">
+        <p class="eyebrow" style="justify-content:center; display:flex;">Pricing</p>
+        <h1>Simple pricing,<br /><em>coming soon.</em></h1>
+        <p>We're still shaping the plans. Join the waitlist now and lock in early-tester pricing before we launch.</p>
+      </div>
+    </section>
+
+    <section class="offer-wrap" style="padding-top:0;">
+      <div class="wrap">
+        <div class="offer reveal in">
+          <span class="ruled-top"></span>
+          <span class="badge">Early access · <b>50% off for testers</b></span>
+          <h2>Be first on paper.</h2>
+          <div class="price-line">
+            <span class="soon">Coming soon</span>
+            <span class="off">50% off</span>
+          </div>
+          <p class="sub">Early testers help shape PenTrace and keep half-price pricing for life when plans go live.</p>
+
+          <ul class="incl">
+            <li><span class="c">✓</span> Full real-time handwriting capture from your webcam</li>
+            <li><span class="c">✓</span> AI recognition — turn paper into editable, checkable text</li>
+            <li><span class="c">✓</span> On-device tracking, private by default</li>
+            <li><span class="c">✓</span> <span>Early access to new features</span> <span class="mut">before anyone else</span></li>
+          </ul>
+
+          <form class="waitlist" id="waitlistForm" novalidate>
+            <input type="email" id="waitlistEmail" placeholder="you@school.edu" autocomplete="email" required />
+            <button type="submit" class="btn btn-primary">Join the waitlist <span class="arrow">→</span></button>
+          </form>
+          <p class="form-note" id="formNote">No spam. One email when early access opens.</p>
+
+          <div class="success" id="waitlistSuccess">
+            <span class="tick">✓</span>
+            <span><strong>You're on the list.</strong> We'll email <span id="successEmail"></span> the moment early access opens — with your 50% tester discount attached.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="reassure">
+      <div class="wrap">
+        <div class="grid3">
+          <div class="reveal">
+            <div class="q">When does it launch?</div>
+            <div class="a">The capture engine works today — try it in the live demo. Full AI recognition and accounts are next; waitlist members get in first.</div>
+          </div>
+          <div class="reveal">
+            <div class="q">What will it cost?</div>
+            <div class="a">Not final yet — that's the honest answer. Testers lock in 50% off whatever the student plan lands at, for life.</div>
+          </div>
+          <div class="reveal">
+            <div class="q">Do I need anything?</div>
+            <div class="a">Just a laptop with a webcam, paper, and a dark pen. No tablet, no stylus, no special hardware.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div class="wrap">
+        <div class="footer-inner">
+          <div>
+            <a class="brand" href="/">PenTrace<span class="dot">.</span></a>
+            <p>Your paper practice, kept digital. Camera-based handwriting capture for students.</p>
+          </div>
+          <div class="footer-links">
+            <div class="footer-col">
+              <h4>Product</h4>
+              <a href="/">Home</a>
+              <a href="/demo.html">Live demo</a>
+              <a href="/pricing.html">Pricing</a>
+            </div>
+            <div class="footer-col">
+              <h4>Early access</h4>
+              <a href="/pricing.html">Join the waitlist</a>
+              <a href="/pricing.html">50% off for testers</a>
+            </div>
+          </div>
+        </div>
+        <div class="footer-bottom">
+          <span>© 2026 PenTrace. Early access.</span>
+          <span>Made for people who think on paper.</span>
+        </div>
+      </div>
+    </footer>
+
+    <script type="module" src="/src/pricing.ts"></script>
+  </body>
+</html>

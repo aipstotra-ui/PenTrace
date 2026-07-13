@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PenTrace — live demo</title>
+    <meta name="description" content="Watch PenTrace reconstruct handwriting from the camera in real time. Run the synthetic demo or use your own webcam." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/src/site.css" />
+    <style>
+      /* ---- demo page: light chrome, dark instrument ---- */
+      .demo-head { padding: 40px 0 26px; }
+      .demo-head h1 { font-size: clamp(2rem, 4vw, 3rem); }
+      .demo-head p { color: var(--ink-soft); margin-top: 12px; max-width: 62ch; font-size: 1.08rem; }
+
+      .toolbar {
+        display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+        padding: 14px; margin-bottom: 16px;
+        background: #fff; border: 1px solid rgba(23,23,28,0.08);
+        border-radius: var(--radius); box-shadow: var(--shadow);
+      }
+      .toolbar .btn { padding: 9px 15px; font-size: 0.9rem; }
+      .tbtn {
+        background: var(--paper-2); color: var(--ink); border: 1px solid rgba(23,23,28,0.1);
+        border-radius: 9px; padding: 9px 15px; font-size: 0.9rem; font-family: var(--sans);
+        font-weight: 500; cursor: pointer; transition: border-color 0.15s ease, color 0.15s ease;
+      }
+      .tbtn:hover { border-color: var(--accent); color: var(--accent); }
+      .toolbar .sep { flex: 1; }
+
+      .instrument {
+        background: var(--instrument);
+        border-radius: var(--radius-lg);
+        padding: 16px;
+        color: #e8eaf0;
+        box-shadow: var(--shadow-lg);
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+      }
+      .pane {
+        background: #1c1f28; border: 1px solid #2c3040; border-radius: 12px;
+        padding: 12px; display: flex; flex-direction: column; gap: 10px; min-width: 0;
+      }
+      .pane h2 { font-family: var(--mono); font-size: 0.68rem; font-weight: 500; color: #8b91a5; text-transform: uppercase; letter-spacing: 0.14em; margin: 0; }
+      .canvas-wrap { position: relative; width: 100%; }
+      canvas { display: block; width: 100%; height: auto; border-radius: 8px; background: #000; }
+      #pageCanvas { background: #fff; }
+      #hud { position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.6); border-radius: 8px; padding: 8px 11px; font-size: 11px; font-family: var(--mono); line-height: 1.55; pointer-events: none; white-space: pre; color: #cfd3e0; }
+      .debug-row { display: flex; gap: 10px; }
+      .debug-row .mini { flex: 1; min-width: 0; }
+      .mini canvas { background: #222; }
+      .mini .cap { font-size: 10px; color: #8b91a5; margin-top: 4px; font-family: var(--mono); letter-spacing: 0.05em; }
+      #recognizeOut { font-size: 0.9rem; color: #e8eaf0; background: #12141a; border: 1px solid #2c3040; border-radius: 9px; padding: 12px 13px; min-height: 40px; white-space: pre-wrap; line-height: 1.55; }
+
+      .statusbar {
+        display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+        margin-top: 14px; padding: 12px 16px;
+        background: #fff; border: 1px solid rgba(23,23,28,0.08); border-radius: var(--radius);
+        font-size: 0.9rem;
+      }
+      #status { font-family: var(--mono); color: var(--margin); font-size: 0.82rem; }
+      #status.ok { color: var(--ok); }
+      .toggles { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-left: auto; }
+      .toggles label { display: flex; gap: 5px; align-items: center; cursor: pointer; font-size: 0.86rem; color: var(--ink-soft); }
+      input[type="file"] { display: none; }
+
+      .demo-tips { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 28px 0 10px; }
+      .demo-tips .card { padding: 20px; }
+      .demo-tips .card h3 { font-size: 1.05rem; }
+      .demo-tips .card .k { font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.14em; color: var(--accent); text-transform: uppercase; margin-bottom: 8px; }
+
+      @media (max-width: 900px) {
+        .instrument { grid-template-columns: 1fr; }
+        .demo-tips { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- NAV -->
+    <header class="nav">
+      <div class="wrap nav-inner">
+        <a class="brand" href="/">PenTrace<span class="dot">.</span></a>
+        <nav class="nav-links">
+          <a href="/">Home</a>
+          <a href="/demo.html" aria-current="page">Live demo</a>
+          <a href="/pricing.html">Pricing</a>
+        </nav>
+        <span class="nav-spacer"></span>
+        <a class="btn btn-ghost" href="/pricing.html">Get early access</a>
+      </div>
+    </header>
+
+    <div class="wrap">
+      <div class="demo-head">
+        <p class="eyebrow">Live demo · runs in your browser</p>
+        <h1>Watch it capture handwriting.</h1>
+        <p>Click <strong>Synthetic demo</strong> to see the full pipeline reconstruct a word with no camera needed — or <strong>Start camera</strong>, put a white sheet in view, wait for the blue lock, and write with a dark pen. Everything runs on your device.</p>
+      </div>
+
+      <div class="toolbar">
+        <button id="btnCamera" class="btn btn-primary">Start camera</button>
+        <button id="btnSynthetic" class="tbtn">Synthetic demo</button>
+        <label class="tbtn">Load video<input type="file" id="fileVideo" accept="video/*" /></label>
+        <span class="sep"></span>
+        <button id="btnRelock" class="tbtn">Re-lock paper</button>
+        <button id="btnClear" class="tbtn">Clear page</button>
+        <button id="btnExport" class="tbtn">Export PNG</button>
+        <button id="btnRecognize" class="tbtn">Recognize</button>
+      </div>
+
+      <div class="instrument">
+        <div class="pane">
+          <h2>Camera</h2>
+          <div class="canvas-wrap">
+            <canvas id="cameraCanvas" width="1280" height="720"></canvas>
+            <div id="hud"></div>
+          </div>
+          <div class="debug-row">
+            <div class="mini">
+              <canvas id="rectifiedCanvas" width="320" height="240"></canvas>
+              <div class="cap">Rectified page (top-down)</div>
+            </div>
+            <div class="mini">
+              <canvas id="inkDiffCanvas" width="320" height="240"></canvas>
+              <div class="cap">Fresh ink detection</div>
+            </div>
+          </div>
+        </div>
+        <div class="pane">
+          <h2>Digital page</h2>
+          <div class="canvas-wrap">
+            <canvas id="pageCanvas" width="1000" height="750"></canvas>
+          </div>
+          <div id="recognizeOut">Recognition output will appear here.</div>
+        </div>
+      </div>
+
+      <div class="statusbar">
+        <span id="status">Loading…</span>
+        <span class="toggles">
+          <label><input type="checkbox" id="tglLandmarks" checked /> hand landmarks</label>
+          <label><input type="checkbox" id="tglQuad" checked /> paper quad</label>
+          <label><input type="checkbox" id="tglTip" checked /> pen tip</label>
+          <label><input type="checkbox" id="tglTrail" checked /> provisional trail</label>
+        </span>
+      </div>
+
+      <div class="demo-tips">
+        <div class="card">
+          <div class="k">01 / Rectified page</div>
+          <h3>The flattened view</h3>
+          <p>PenTrace maps your slanted sheet to a clean top-down page. That's the surface it reads ink from.</p>
+        </div>
+        <div class="card">
+          <div class="k">02 / Fresh ink</div>
+          <h3>What just got written</h3>
+          <p>Red pixels are ink that appeared this instant — after masking out your hand, the pen, and shadows.</p>
+        </div>
+        <div class="card">
+          <div class="k">03 / Recognize</div>
+          <h3>Handoff to AI</h3>
+          <p>The clean strokes are exactly what gets sent to AI recognition. Full text output ships next.</p>
+        </div>
+      </div>
+    </div>
+
+    <footer class="footer" style="margin-top:56px;">
+      <div class="wrap">
+        <div class="footer-inner">
+          <div>
+            <a class="brand" href="/">PenTrace<span class="dot">.</span></a>
+            <p>Your paper practice, kept digital. Camera-based handwriting capture for students.</p>
+          </div>
+          <div class="footer-links">
+            <div class="footer-col">
+              <h4>Product</h4>
+              <a href="/">Home</a>
+              <a href="/demo.html">Live demo</a>
+              <a href="/pricing.html">Pricing</a>
+            </div>
+            <div class="footer-col">
+              <h4>Early access</h4>
+              <a href="/pricing.html">Join the waitlist</a>
+              <a href="/pricing.html">50% off for testers</a>
+            </div>
+          </div>
+        </div>
+        <div class="footer-bottom">
+          <span>© 2026 PenTrace. Early access.</span>
+          <span>Made for people who think on paper.</span>
+        </div>
+      </div>
+    </footer>
+
+    <video id="video" playsinline muted style="display: none"></video>
+    <script src="/vendor/opencv.js"></script>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

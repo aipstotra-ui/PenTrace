@@ -1,0 +1,20 @@
+# Dependencies (regenerate with: npm install --prefix pentrace)
+node_modules/
+
+# Build output
+dist/
+pentrace/dist/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / editor cruft
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Local env
+.env
+.env.local

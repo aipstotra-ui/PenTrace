@@ -1,0 +1,35 @@
+<!doctype html>
+<html>
+  <head><meta charset="utf-8" /><title>opencv isolation test</title></head>
+  <body>
+    <div id="out">loading opencv.js…</div>
+    <script>
+      const t0 = performance.now();
+      document.title = 'ocv: script queued';
+      window.addEventListener('error', (e) => {
+        document.getElementById('out').textContent = 'window error: ' + e.message;
+      });
+      function poll() {
+        const cv = window.cv;
+        const el = document.getElementById('out');
+        const dt = ((performance.now() - t0) / 1000).toFixed(1);
+        if (!cv) {
+          el.textContent = `t=${dt}s: window.cv undefined`;
+        } else if (typeof cv.then === 'function') {
+          el.textContent = `t=${dt}s: cv is thenable`;
+          document.title = 'ocv: thenable';
+        } else if (cv.Mat) {
+          el.textContent = `t=${dt}s: cv.Mat READY`;
+          document.title = 'ocv: READY';
+          return;
+        } else {
+          el.textContent = `t=${dt}s: cv exists, no Mat yet`;
+          document.title = 'ocv: no Mat yet';
+        }
+        setTimeout(poll, 250);
+      }
+      poll();
+    </script>
+    <script src="/vendor/opencv.js" onload="document.title='ocv: script loaded'"></script>
+  </body>
+</html>
