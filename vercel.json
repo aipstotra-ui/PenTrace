@@ -1,0 +1,6 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "npm --prefix pentrace install",
+  "buildCommand": "npm --prefix pentrace run build",
+  "outputDirectory": "pentrace/dist"
+}
