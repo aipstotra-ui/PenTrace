@@ -1,27 +1,9 @@
 // Landing-page motion: scroll reveals + the three "how it works" mini scenes.
 // Kept deliberately light — no framework, respects reduced-motion.
 
-const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+import { initReveals, prefersReducedMotion as reduce } from './reveal';
 
-// ---- scroll reveals ----
-const reveals = document.querySelectorAll<HTMLElement>('.reveal:not(.in)');
-if (reduce) {
-  reveals.forEach((el) => el.classList.add('in'));
-} else {
-  const io = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((e, i) => {
-        if (e.isIntersecting) {
-          const el = e.target as HTMLElement;
-          setTimeout(() => el.classList.add('in'), (i % 3) * 90);
-          io.unobserve(el);
-        }
-      });
-    },
-    { threshold: 0.16, rootMargin: '0px 0px -8% 0px' },
-  );
-  reveals.forEach((el) => io.observe(el));
-}
+initReveals(90);
 
 // ---- mini scene canvases (the 3 how-it-works tiles) ----
 type Scene = 'track' | 'confirm' | 'digitize';

@@ -2,24 +2,9 @@
 // No backend — stores the address locally and confirms. Swap storeEmail() for
 // a real API/Formspree/Supabase call when the backend lands.
 
-const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const reveals = document.querySelectorAll<HTMLElement>('.reveal:not(.in)');
-if (reduce) {
-  reveals.forEach((el) => el.classList.add('in'));
-} else {
-  const io = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((e) => {
-        if (e.isIntersecting) {
-          e.target.classList.add('in');
-          io.unobserve(e.target);
-        }
-      });
-    },
-    { threshold: 0.2 },
-  );
-  reveals.forEach((el) => io.observe(el));
-}
+import { initReveals } from './reveal';
+
+initReveals();
 
 const form = document.getElementById('waitlistForm') as HTMLFormElement;
 const email = document.getElementById('waitlistEmail') as HTMLInputElement;
