@@ -22,7 +22,10 @@ const TRAIL_KEEP_MS = 3000;
 // eligibility, late ink from under the hand is neither confirmed (window
 // expired) nor orphan-stamped (still "near trail") — silently lost.
 const FUSE_WINDOW_MS = TRAIL_KEEP_MS;
-const CONFIRM_RADIUS = 14; // page px, trail point ↔ ink
+// Page px, trail point ↔ ink. At ~3.4 page px/mm this is ~3mm: wide enough to
+// tolerate tip-estimate error, tight enough not to smear adjacent letters of
+// normal 4-5mm handwriting into one another.
+const CONFIRM_RADIUS = 10;
 const CELL = 16; // spatial grid for ink lookup
 // Ink arrives in ~170ms batches (ink tick cadence) while trail points land
 // every ~33ms, so ~5 points between batches are legitimately unconfirmed
@@ -36,7 +39,7 @@ const STROKE_GAP_MS = 500; // time gap that always splits strokes
 // emerging), keeping a run alive across the hop. Hops move much faster
 // than writing, so a large jump between consecutive confirmed points means
 // pen-up travel, not a stroke — split regardless of timing.
-const MAX_JOIN_DIST = 40; // page px
+const MAX_JOIN_DIST = 30; // page px
 // A run older than this is force-committed even while still growing, so a
 // long continuous stroke (>3s: underlines, cursive words) commits in
 // chapters BEFORE its head is evicted from the trail. Chapters re-join via
@@ -46,17 +49,32 @@ const FORCE_COMMIT_AGE_MS = TRAIL_KEEP_MS - 500;
 // for two ink ticks plus slack — the mask-aware replacement for a fixed
 // wall-clock window, since the hand can sit over fresh ink indefinitely.
 const PENDING_OBS_MS = 550;
-// Stub gate: a committable run must cover some ground or time…
-const MIN_STROKE_ARC = 8; // page px
-const MIN_STROKE_DUR_MS = 100; // the synthetic i-dot (~250ms, ~12px) passes
+/**
+ * Strict commit gate. The old rule was `arc >= 8 OR dur >= 100ms` — an OR, so
+ * a hand hovering almost still for a tenth of a second committed a "stroke"
+ * with essentially zero movement. That is where the phantom dots came from.
+ *
+ * Now every stroke must be backed by real ink (MIN_STROKE_INK), and then be
+ * EITHER a genuine mark that travelled (arc + several points) OR a deliberate
+ * small mark with strong ink behind it (an i-dot, a decimal point).
+ */
+const MIN_STROKE_INK = 14; // confirmed ink px summed over the run — hard floor
+const STRONG_INK = 34; // ink alone sufficient for a deliberate tiny mark
+const MIN_STROKE_ARC = 6; // page px (~1.8mm)
+const MIN_STROKE_POINTS_MOVED = 3;
 
 const MIN_STROKE_POINTS = 2;
-const ORPHAN_MIN_DENSITY = 4; // fresh px within one cell to count as real
+// Fresh px within one cell for unclaimed ink to be stamped. Raised hard: this
+// path writes straight to the page with no trail corroboration at all, so it
+// must demand a mark far denser than any noise speck.
+const ORPHAN_MIN_DENSITY = 12;
 
 interface FusePoint extends TrailPoint {
   consumed: boolean;
   snapX: number;
   snapY: number;
+  /** Ink pixels that confirmed this point — the evidence behind the stroke. */
+  ink: number;
 }
 
 export class StrokeStore {
@@ -103,6 +121,7 @@ export class StrokeStore {
       consumed: false,
       snapX: p.x,
       snapY: p.y,
+      ink: 0,
     });
     // Age-based eviction must NEVER drop a confirmed-but-uncommitted point:
     // its ink was already consumed from the diff (it will not re-report),
@@ -128,14 +147,20 @@ export class StrokeStore {
       tail &&
       run.every((p) => Math.hypot(p.snapX - tail.x, p.snapY - tail.y) <= CONFIRM_RADIUS)
     ) {
-      return false;
+      return false; // hop-tail contamination, not a new stroke
     }
+    // Hard floor: no ink, no stroke. Duration alone can never commit a mark,
+    // which is what let a hovering hand draw dots.
+    const totalInk = run.reduce((s, p) => s + p.ink, 0);
+    if (totalInk < MIN_STROKE_INK) return false;
+
     let arc = 0;
     for (let i = 1; i < run.length; i++) {
       arc += Math.hypot(run[i].snapX - run[i - 1].snapX, run[i].snapY - run[i - 1].snapY);
     }
-    const dur = run[run.length - 1].t - run[0].t;
-    return arc >= MIN_STROKE_ARC || dur >= MIN_STROKE_DUR_MS;
+    // A mark that travelled, or a small mark with strong ink behind it.
+    if (arc >= MIN_STROKE_ARC && run.length >= MIN_STROKE_POINTS_MOVED) return true;
+    return totalInk >= STRONG_INK;
   }
 
   /** Recent trail for the provisional (grey) rendering. */
@@ -195,6 +220,7 @@ export class StrokeStore {
         tp.inkConfirmed = true;
         tp.snapX = sx / cnt;
         tp.snapY = sy / cnt;
+        tp.ink = cnt;
       }
     }
 

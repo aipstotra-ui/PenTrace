@@ -4,7 +4,7 @@ import { FpsMeter, drawHand, drawQuad, drawTip } from './debug';
 import { HandTracker } from './hand';
 import type { HandResult } from './hand';
 import { INDEX_MCP, INDEX_TIP, THUMB_TIP, WRIST } from './hand';
-import { InkDiff, TIP_MASK_RADIUS } from './inkdiff';
+import { InkDiff, PAPER_PRESENT_FRAC, TIP_MASK_RADIUS } from './inkdiff';
 import { PageRenderer } from './page';
 import { PaperTracker } from './paper';
 import { PenTipEstimator } from './pentip';
@@ -23,7 +23,14 @@ const INK_MS = 170; // two-tick ink persistence ⇒ ~340ms confirm latency
 const HUD_MS = 170;
 const MOVED_CHECKS_TO_RELOCK = 2; // consecutive, avoids relock on occlusion flukes
 const DETECT_W = 320;
-const MIN_TIP_CONF = 0.3;
+// Only a genuinely detected nib may drive the trail. refineDarkTip scores a
+// real nib >= 0.5 and everything else 0, so this gate is what stops a bare
+// hand (or a hand whose pen is out of view) from generating phantom strokes.
+const MIN_TIP_CONF = 0.45;
+// Consecutive ink ticks of "the page doesn't look like paper any more" before
+// we drop the lock. ~3 x 170ms ≈ 0.5s: fast enough that lifting the sheet
+// stops capture immediately, slow enough to ride out a flicker.
+const PAPER_LOST_TICKS = 3;
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 
@@ -75,6 +82,8 @@ let nextPaperMs = 0;
 let nextInkMs = 0;
 let nextHudMs = 0;
 let lastFreshCount = 0;
+let lostStreak = 0;
+let lastPaperFrac = 1;
 let lastTipVideo: Pt | null = null;
 let lastTipSeenMs = 0;
 let lastPinchVideo: Pt | null = null;
@@ -159,6 +168,8 @@ function startSource(s: FrameSource): void {
   stopLoop();
   source = s;
   movedStreak = 0;
+  lostStreak = 0;
+  lastPaperFrac = 1;
   lastVideoTime = -1;
   nextPaperMs = nextInkMs = nextHudMs = 0;
   lastTipVideo = null;
@@ -185,6 +196,8 @@ function relock(reason: string): void {
   paper.unlock();
   ink.reset();
   movedStreak = 0;
+  lostStreak = 0;
+  lastPaperFrac = 1;
   setStatus(`${reason} — re-locking paper (captured strokes kept)…`);
 }
 
@@ -333,6 +346,21 @@ function loop(): void {
       }
       const res = ink.tick(rect, maskPolys, tipPage, now);
       lastFreshCount = res.fresh.length;
+      lastPaperFrac = res.paperFraction;
+
+      // Paper gone? Drop the lock and stop capturing. Without this the
+      // homography stayed locked to a patch of empty desk forever, and every
+      // hand movement over that patch kept drawing.
+      if (res.paperFraction < PAPER_PRESENT_FRAC) {
+        if (++lostStreak >= PAPER_LOST_TICKS) {
+          relock('Paper lost');
+          scheduleLoop();
+          return;
+        }
+      } else {
+        lostStreak = 0;
+      }
+
       store.fuse(res.fresh, now, (x, y) => ink.observedSince(x, y));
       drawScaled(els.rectified, rectifiedScratch, grayToImageData(rect));
       drawScaled(els.inkDiff, inkDiffScratch, res.debug);
@@ -360,8 +388,9 @@ function loop(): void {
       `fps        ${f.toFixed(0)}`,
       `source     ${source.kind}`,
       `hands      ${hands.length || (source.tipOverride ? 'injected' : '—')}`,
-      `tip conf   ${tip ? tip.conf.toFixed(2) : '—'}`,
+      `PEN        ${tip && tip.conf >= MIN_TIP_CONF ? `yes (${tip.conf.toFixed(2)})` : 'NO — not tracking'}`,
       `paper      ${paper.lock ? `locked ${paper.lock.pageW}×${paper.lock.pageH}` : 'searching'}`,
+      `paper seen ${(lastPaperFrac * 100).toFixed(0)}% ${lastPaperFrac < PAPER_PRESENT_FRAC ? '← LOST' : ''}`,
       `trail pts  ${store.trailLength()}`,
       `strokes    ${store.strokes.length}`,
       `fresh ink  ${lastFreshCount}px`,

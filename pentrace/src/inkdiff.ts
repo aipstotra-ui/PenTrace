@@ -32,22 +32,43 @@ import type { Pt } from './types';
  *   accumulate.
  */
 
-const INK_THRESH = 30; // gray levels darker than R
+// Gray levels darker than R. Must sit ABOVE shadow contrast and BELOW pen
+// contrast: a soft hand/pen shadow on white paper is ~25-50 levels darker,
+// real ballpoint ink is 100+. 30 let every moving shadow through as "ink".
+const INK_THRESH = 48;
 const EMA = 0.08; // background adaptation rate per tick
 const GAIN_CLAMP: [number, number] = [0.7, 1.4];
 const MIN_NEIGHBORS = 2; // 8-neighborhood support for a fresh pixel
 const MAX_STROKE_THICKNESS = 8; // page px; area/length above this = blob, not ink
+// Floor. Without one, a 3px speck of sensor noise counted as ink and, if it
+// landed near the trail, committed a phantom dot. Real writing always leaves
+// a connected mark of at least this size at page scale.
+const MIN_COMPONENT_AREA = 10; // page px²
+const MIN_COMPONENT_LEN = 3; // page px, longest bbox side
 // Generous: a whole cursive word discovered in one tick from under a lifted
 // hand is a single thin component and can be large. Thickness is the real
 // gate; this only stops page-scale artifacts.
 const MAX_COMPONENT_AREA = 12000; // page px²
-export const TIP_MASK_RADIUS = 14; // page px around the nib
+// Page px around the nib. This masks the DARK NIB so it isn't read as ink —
+// it must be nib-sized (~2mm ≈ 7px), not a halo. At 14 it was an 8mm blind
+// spot that swallowed whole 4-5mm letters, so real writing was never seen.
+export const TIP_MASK_RADIUS = 7;
+/** Unmasked pixels that still look like paper, below which the sheet is gone. */
+export const PAPER_PRESENT_FRAC = 0.45;
 
 export interface InkTickResult {
   /** Fresh ink pixel coords (page space), shape-gated to stroke-like components. */
   fresh: Pt[];
   /** RGBA debug view (fresh=red, masked=blue tint, unknown=dim). */
   debug: ImageData;
+  /**
+   * Fraction of unmasked page pixels that still look like the paper we locked
+   * onto. Collapses when the sheet is removed or slid away — the only signal
+   * that survives a hand resting on the page (quad detection does not: the
+   * hand merges with the sheet's contour and returns nothing, which is why
+   * "paper gone" was never noticed before).
+   */
+  paperFraction: number;
 }
 
 export class InkDiff {
@@ -60,6 +81,8 @@ export class InkDiff {
   private debugImg: ImageData | null = null;
   /** When each pixel last BECAME observable; -1 while masked. */
   private unmaskedSince: Float32Array | null = null;
+  /** Median brightness of the paper when this model was built; -1 until set. */
+  private paperLevel = -1;
   private w = 0;
   private h = 0;
   private snapAll = false;
@@ -73,6 +96,7 @@ export class InkDiff {
     this.freshMask = null;
     this.debugImg = null;
     this.unmaskedSince = null;
+    this.paperLevel = -1;
   }
 
   /**
@@ -149,6 +173,28 @@ export class InkDiff {
       }
     }
 
+    // Paper presence. Establish the paper's brightness once, then each tick
+    // measure how much of the visible page still matches it. Removing the
+    // sheet drops this off a cliff; a hand resting on the page does not (it's
+    // masked out of the sample).
+    let paperFraction = 1;
+    {
+      const lit: number[] = [];
+      for (let i = 0; i < n; i += 31) {
+        if (!mask[i]) lit.push(data[i] * gain);
+      }
+      if (lit.length > 50) {
+        if (this.paperLevel < 0) {
+          const s = [...lit].sort((a, b) => a - b);
+          this.paperLevel = s[s.length >> 1];
+        }
+        const floor = this.paperLevel - 70;
+        let hits = 0;
+        for (const v of lit) if (v >= floor) hits++;
+        paperFraction = hits / lit.length;
+      }
+    }
+
     if (this.snapAll) {
       this.snapAll = false;
       for (let i = 0; i < n; i++) {
@@ -159,7 +205,7 @@ export class InkDiff {
       }
       prevCand.fill(0);
       freshMask.fill(0);
-      return { fresh: [], debug: this.renderDebug(data, mask, freshMask) };
+      return { fresh: [], debug: this.renderDebug(data, mask, freshMask), paperFraction };
     }
 
     // Pass 1: candidates (dark vs R, two-tick persistence).
@@ -209,7 +255,7 @@ export class InkDiff {
     }
     prevCand.set(cand);
 
-    return { fresh, debug: this.renderDebug(data, mask, freshMask) };
+    return { fresh, debug: this.renderDebug(data, mask, freshMask), paperFraction };
   }
 
   private filterComponents(freshMask: Uint8Array, w: number, h: number): Pt[] {
@@ -249,9 +295,16 @@ export class InkDiff {
         }
       }
       // Thickness ≈ area / longest bbox side. Thin strokes pass, blobs don't.
+      // Too-small components are noise specks, not writing (this floor is what
+      // stopped hand movement from stamping phantom dots).
       const len = Math.max(maxX - minX + 1, maxY - minY + 1);
       const thickness = comp.length / len;
-      if (comp.length > MAX_COMPONENT_AREA || thickness > MAX_STROKE_THICKNESS) {
+      if (
+        comp.length < MIN_COMPONENT_AREA ||
+        len < MIN_COMPONENT_LEN ||
+        comp.length > MAX_COMPONENT_AREA ||
+        thickness > MAX_STROKE_THICKNESS
+      ) {
         for (const i of comp) freshMask[i] = 0; // rejected: stays candidate
       } else {
         for (const i of comp) fresh.push({ x: i % w, y: (i / w) | 0 });

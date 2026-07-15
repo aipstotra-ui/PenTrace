@@ -34,9 +34,18 @@ const PATCH_RADIUS_MAX = 48;
 const DARK_FRACTION = 0.35; // pixel must be this much darker than patch median
 const MIN_DARK_PIXELS = 6;
 const FILTER_RESET_MS = 300;
-// Below the trail gate (MIN_TIP_CONF=0.3): a pure geometric guess with no
-// visible nib is 20–40 px off and would pollute trail↔ink confirmation.
-const FALLBACK_CONF = 0.25;
+/**
+ * No pen means NO tracking. Previously any dark thing near the fingertips —
+ * the hand's own shadow — was accepted as a "nib", so an empty hand moving
+ * over the page generated a trail and stamped phantom marks. A real nib is
+ * (a) MUCH darker than the paper around it, and (b) SMALL. A shadow is soft
+ * and broad, and fails both.
+ */
+const PEN_MIN_CONTRAST = 70; // patch median − darkest; ink/plastic ≫ shadow
+const PEN_MAX_DARK_SAMPLES = 90; // a nib is compact; a shadow floods the patch
+// A pure geometric guess with no visible nib is 20–40px off. Score it 0 so the
+// MIN_TIP_CONF gate drops it rather than polluting trail↔ink confirmation.
+const FALLBACK_CONF = 0;
 
 export class PenTipEstimator {
   private fx = new OneEuro(1.2, 0.008, 1.0);
@@ -127,7 +136,8 @@ function refineDarkTip(
   const median = sorted[sorted.length >> 1];
   const darkest = sorted[0];
   const thresh = darkest + (median - darkest) * DARK_FRACTION;
-  if (median - darkest < 25) return { ...prior, conf: FALLBACK_CONF }; // no dark nib visible
+  // Not dark enough to be a pen nib — this is bare hand, or shadow only.
+  if (median - darkest < PEN_MIN_CONTRAST) return { ...prior, conf: FALLBACK_CONF };
 
   const sigma2 = r * r * 0.5;
   let wSum = 0;
@@ -149,7 +159,11 @@ function refineDarkTip(
       count++;
     }
   }
-  if (count < MIN_DARK_PIXELS || wSum === 0) return { ...prior, conf: FALLBACK_CONF };
+  // Too few dark pixels = nothing there; too many = a broad shadow flooding the
+  // patch, not a compact nib. Both mean "no pen" under strict capture.
+  if (count < MIN_DARK_PIXELS || count > PEN_MAX_DARK_SAMPLES || wSum === 0) {
+    return { ...prior, conf: FALLBACK_CONF };
+  }
   return { x: wx / wSum, y: wy / wSum, conf: Math.min(1, 0.5 + count / 60) };
 }
 
